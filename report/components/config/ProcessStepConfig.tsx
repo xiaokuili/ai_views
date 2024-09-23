@@ -13,48 +13,56 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings2, Eye, Send, Loader2 } from "lucide-react";
+import { Settings2, Code, Hash, AlignLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { CardLayout } from "./Layout";
-import { createOrUpdateReportTemplate, deleteReportTemplate } from "@/lib/api";
-import { useTestReportContext } from "@/context/ReportContext";
-import { FileText, AlignLeft } from "lucide-react";
+import { createOrUpdateProcessStep, deleteProcessStep } from "@/lib/api";
 import { ActionButtons } from "../ActionButton";
-import { Template } from "@/types/base";
+import { ProcessStep } from "@/types/base";
 
 const formSchema = z.object({
-  title: z.string().min(2, {
-    message: "Title must be at least 2 characters.",
+  function_name: z.string().min(1, {
+    message: "Function name is required.",
+  }),
+  parameters: z.string().min(2, {
+    message: "Parameters must be valid JSON.",
+  }),
+  outputs: z.string().min(1, {
+    message: "Output key is required.",
   }),
   description: z.string().min(5, {
     message: "Description must be at least 5 characters.",
   }),
 });
 
-export function TemplateConfig({ template }: { template: Template }) {
+export function ProcessStepConfig({
+  step,
+  sectionId,
+}: {
+  step: ProcessStep;
+  sectionId: string;
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [CardTitle, setCardTitle] = useState(template?.title);
-  const { setTestReportState } = useTestReportContext();
+  const [cardTitle, setCardTitle] = useState(
+    step?.description || "Processing Step"
+  );
   const { toast } = useToast();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: template?.title,
-      description: template?.description,
+      function_name: step?.function_name,
+      parameters: JSON.stringify(step?.parameters, null, 2),
+      outputs: step?.outputs.join(", "), // 将数组转换为逗号分隔的字符串
+      description: step?.description,
     },
   });
-  // 监听表单 title 字段的变化
+
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === "title") {
-        setCardTitle(value.title || "");
+      if (name === "description") {
+        setCardTitle(value.description || "Processing Step");
       }
     });
     return () => subscription.unsubscribe();
@@ -63,19 +71,21 @@ export function TemplateConfig({ template }: { template: Template }) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     try {
-      const updatedTemplate: Template = {
-        ...template,
+      const updatedStep: ProcessStep = {
+        ...step,
         ...values,
+        parameters: JSON.parse(values.parameters),
+        outputs: values.outputs.split(",").map((output) => output.trim()), // 将字符串转换为数组
       };
-      await createOrUpdateReportTemplate(updatedTemplate);
+      await createOrUpdateProcessStep(sectionId, updatedStep);
       toast({
         title: "Success",
-        description: `Template ${template.id} updated successfully`,
+        description: `Processing step ${step.id} updated successfully`,
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to save template ${template.id}`,
+        description: `Failed to save processing step ${step.id}`,
         variant: "destructive",
       });
     } finally {
@@ -83,17 +93,11 @@ export function TemplateConfig({ template }: { template: Template }) {
     }
   }
 
-  function onPreview() {
-    setTestReportState({ id: template.id, type: "template" });
-
-    console.log("Preview:");
-  }
-
   async function onDelete() {
-    if (!template.id) {
+    if (!step.id) {
       toast({
         title: "Error",
-        description: "Cannot delete a template without an ID",
+        description: "Cannot delete a processing step without an ID",
         variant: "destructive",
       });
       return;
@@ -101,15 +105,15 @@ export function TemplateConfig({ template }: { template: Template }) {
 
     setIsDeleting(true);
     try {
-      await deleteReportTemplate(template.id);
+      await deleteProcessStep(sectionId, step.id);
       toast({
         title: "Success",
-        description: `Template ${template.id} deleted successfully`,
+        description: `Processing step ${step.id} deleted successfully`,
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to delete template ${template.id}`,
+        description: `Failed to delete processing step ${step.id}`,
         variant: "destructive",
       });
     } finally {
@@ -117,10 +121,10 @@ export function TemplateConfig({ template }: { template: Template }) {
     }
   }
 
-  const Header = (CardTitle: string) => (
+  const Header = (title: string) => (
     <div className='flex items-center space-x-2'>
       <Settings2 className='h-4 w-4' />
-      <span>{CardTitle}</span>
+      <span>{title}</span>
     </div>
   );
 
@@ -129,14 +133,15 @@ export function TemplateConfig({ template }: { template: Template }) {
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
         <FormField
           control={form.control}
-          name='title'
+          name='function_name'
           render={({ field }) => (
             <FormItem>
+              <FormLabel>Function Name</FormLabel>
               <FormControl>
                 <div className='relative'>
-                  <FileText className='absolute left-2 top-2.5 h-4 w-4 text-muted-foreground' />
+                  <Hash className='absolute left-2 top-2.5 h-4 w-4 text-muted-foreground' />
                   <Input
-                    placeholder='输入模版标题'
+                    placeholder='Enter function name'
                     className='pl-8'
                     {...field}
                   />
@@ -148,14 +153,48 @@ export function TemplateConfig({ template }: { template: Template }) {
         />
         <FormField
           control={form.control}
+          name='parameters'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Parameters (JSON)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder='Enter parameters as JSON'
+                  className='min-h-[100px] font-mono'
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name='outputs'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Outputs</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder='Enter output keys, separated by commas'
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
           name='description'
           render={({ field }) => (
             <FormItem>
+              <FormLabel>Description</FormLabel>
               <FormControl>
                 <div className='relative'>
                   <AlignLeft className='absolute left-2 top-2.5 h-4 w-4 text-muted-foreground' />
                   <Textarea
-                    placeholder='输入模版描述'
+                    placeholder='Enter step description'
                     className='pl-8 min-h-[100px]'
                     {...field}
                   />
@@ -177,11 +216,5 @@ export function TemplateConfig({ template }: { template: Template }) {
     </Form>
   );
 
-  return (
-    <CardLayout
-      header={Header(CardTitle || "基础信息")}
-      content={content}
-      onTest={onPreview}
-    />
-  );
+  return <CardLayout header={Header(cardTitle)} content={content} />;
 }

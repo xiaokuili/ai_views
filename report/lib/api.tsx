@@ -1,4 +1,10 @@
-import { Template, Section, Query, DataSource } from "../types/base";
+import {
+  Template,
+  Section,
+  Query,
+  DataSource,
+  ProcessingStep,
+} from "../types/base";
 import {
   SectionResponse,
   QueryResponse,
@@ -235,6 +241,28 @@ export async function createOrUpdateQuery(
   return response.json();
 }
 
+export async function getQueryBySection(sectionId: string): Promise<Query> {
+  const response = await fetch(`${API_BASE_URL}/sections/${sectionId}/query`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new ApiError("Query not found", 404);
+    }
+    throw new ApiError(
+      `Failed to fetch query: ${response.statusText}`,
+      response.status
+    );
+  }
+
+  const data = await response.json();
+  return data as Query;
+}
+
 export async function getQuery(queryId: string): Promise<Query> {
   const response = await fetch(`${API_BASE_URL}/queries/${queryId}`, {
     method: "GET",
@@ -292,4 +320,185 @@ export async function predictSQL(request: SQLPredictRequest): Promise<string> {
       throw new Error("Failed to predict SQL");
     }
   }
+}
+
+export interface SQLSearchRequest {
+  sql: string;
+  data_source_id: string;
+}
+
+export interface SQLSearchResponse {
+  result: Array<Record<string, any>>;
+}
+export async function searchSQL(
+  request: SQLSearchRequest
+): Promise<SQLSearchResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/search_sql_by_datasource`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(
+        `AI error: ${
+          errorData.detail || response.statusText || "Unknown error"
+        }`,
+        response.status
+      );
+    }
+
+    const data: SQLSearchResponse = await response.json();
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    } else if (error instanceof Error) {
+      throw new ApiError(`Failed to search SQL: ${error.message}`, 500);
+    } else {
+      throw new ApiError("An unknown error occurred while searching SQL", 500);
+    }
+  }
+}
+interface GenerateStepsRequest {
+  section: Section;
+  data_source_example?: Record<string, any>;
+}
+
+export async function predictSectionProcessingSteps(
+  sectionId: string,
+  request: GenerateStepsRequest
+): Promise<ProcessingStep[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/sections/${sectionId}/generate_steps`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 500) {
+      const errorData = await response.json();
+      throw new ApiError(
+        errorData.detail || "Failed to generate processing steps",
+        500
+      );
+    }
+    throw new ApiError("Failed to generate processing steps", response.status);
+  }
+
+  return response.json();
+}
+
+// process step endpoint
+export async function createOrUpdateProcessStep(
+  sectionId: string,
+  processingStep: ProcessingStep
+): Promise<MetricProcessingResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/processing_steps?section_id=${sectionId}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...processingStep, section_id: sectionId }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      `Failed to create or update processing step: ${
+        errorData.detail || response.statusText || "Unknown error"
+      }`,
+      response.status
+    );
+  }
+
+  return response.json();
+}
+
+// 删除处理步骤
+export async function deleteProcessStep(
+  processingStepId: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/processing_steps/${processingStepId}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      `Failed to delete processing step: ${
+        errorData.detail || response.statusText || "Unknown error"
+      }`,
+      response.status
+    );
+  }
+}
+
+// 获取处理步骤
+export async function getProcessingStepById(
+  processingStepId: string
+): Promise<MetricProcessingResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/processing_steps/${processingStepId}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      `Failed to fetch processing step: ${
+        errorData.detail || response.statusText || "Unknown error"
+      }`,
+      response.status
+    );
+  }
+
+  return response.json();
+}
+
+// 获取某个 section 的所有处理步骤
+export async function getProcessingStepsBySection(
+  sectionId: string
+): Promise<MetricProcessingResponse[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/sections/${sectionId}/processing_steps`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      `Failed to fetch processing steps: ${
+        errorData.detail || response.statusText || "Unknown error"
+      }`,
+      response.status
+    );
+  }
+
+  return response.json();
 }

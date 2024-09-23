@@ -1,39 +1,64 @@
 "use client";
+import { useEffect, useState } from "react";
 import { SplitLayout } from "@/components/SplitLayout";
 import { ConfigPanel } from "@/components/ConfigPanel";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { ReportProvider } from "@/context/ReportContext";
 import { v4 as uuid } from "uuid";
 import { ConfigPanelProps, Template, Section } from "@/types/base";
+import { getReportTemplate, listSections } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
-  const templateId = String(uuid()); // 为模板生成一个 ID
-  const sectionId = String(uuid()); // 为 section 生成一个 ID
+  const [template, setTemplate] = useState<Template | null>(null);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  // 创建初始 sections 列表
-  const initialSections: Section[] = [
-    {
-      id: String(uuid()),
-      section_template: "test11",
-      section_template_description: "test111",
-      example: "test111",
-    },
-    // 可以根据需要添加更多初始 section
-  ];
-  const initialTemplate: Template = {
-    id: templateId,
-    title: "test123",
-    description: "test123",
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const templateId = "2864467e-292d-4762-b4cb-dbec9d4e857c";
+        const fetchedTemplate = await getReportTemplate(templateId);
+        setTemplate(fetchedTemplate);
+
+        const fetchedSections = await listSections(templateId);
+        setSections(fetchedSections);
+      } catch (err) {
+        setError("Failed to fetch data. Please try again later.");
+        toast({
+          title: "Error",
+          description: "Failed to fetch data. Please try again later.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
   return (
     <ReportProvider>
       <SplitLayout
         configPanel={
-          <ConfigPanel
-            initialTemplate={initialTemplate}
-            initialSections={initialSections}
-          />
+          template && (
+            <ConfigPanel
+              initialTemplate={template}
+              initialSections={sections}
+            />
+          )
         }
         previewPanel={<PreviewPanel />}
       />

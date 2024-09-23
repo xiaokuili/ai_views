@@ -15,8 +15,8 @@ export interface Template {
 export interface Section {
   id: string;
   section_template: string;
-  section_template_description: string;
   example: string;
+  section_type: string;
 }
 
 export interface Query {
@@ -34,12 +34,11 @@ export interface DataSource {
   connection_string: string;
 }
 
-export interfaace ProcessingStep {
+export interface ProcessStep {
   id: string;
-  step_type: string;
-  order: number;
-  function_name: string;
-  parameters: json
-  output_key: string;
   description: string;
+  function_name: string;
+  order: number;
+  parameters: json;
+  outputs: string[];
 }

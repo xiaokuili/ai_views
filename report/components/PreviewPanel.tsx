@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 
 import { useTestReportContext } from "@/context/ReportContext";
-import { getQuery, predictSQL } from "@/lib/api";
+import { getQuery, predictSQL, searchSQL } from "@/lib/api";
 
 const TemplatePreview = () => {
   return <div>Template Preview</div>;
@@ -33,6 +33,7 @@ const QueryPreview = ({
   const [predictedSQL, setPredictedSQL] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cleanOLDSQL, setCleanOLDSQL] = useState<string>("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,7 +48,9 @@ const QueryPreview = ({
           old_title: templateTitle,
           new_title: testTitle,
         });
-        setPredictedSQL(sql);
+        const cleanSQL = sql.trim().replace(/\s+/g, " ");
+        setCleanOLDSQL(fetchedQuery.sql.trim().replace(/\s+/g, " "));
+        setPredictedSQL(cleanSQL);
       } catch (err) {
         setError("Failed to fetch data");
         console.error(err);
@@ -64,9 +67,26 @@ const QueryPreview = ({
   if (!query) return <div>No query data available</div>;
 
   return (
-    <div>
-      <p>SQL: {predictedSQL}</p>
-      <p>OLD SQL: {query.sql}</p>
+    <div className='space-y-6'>
+      <div className='space-y-2'>
+        <h3 className='text-lg font-semibold'>SQL Comparison</h3>
+        <div className='p-3 bg-gray-100 rounded-md overflow-x-auto'>
+          <div className='space-y-4'>
+            <div>
+              <h4 className='text-sm font-medium mb-1'>Predicted SQL:</h4>
+              <pre className='bg-white p-2 rounded'>
+                <code>{predictedSQL}</code>
+              </pre>
+            </div>
+            <div>
+              <h4 className='text-sm font-medium mb-1'>Original SQL:</h4>
+              <pre className='bg-white p-2 rounded'>
+                <code>{cleanOLDSQL}</code>
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

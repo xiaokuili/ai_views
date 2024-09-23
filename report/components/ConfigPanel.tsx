@@ -18,7 +18,7 @@ export function ConfigPanel({
 
   const addSection = () => {
     const newSection: Section = {
-      id: uuid(),
+      id: "",
       section_template: "",
       section_template_description: "",
       example: "",
