@@ -4,20 +4,20 @@ CONTAINER_NAME=myapp_container
 
 # 启动命令
 start:
-    @echo "Starting Docker container..."
-    docker-compose up -d
+	@echo "Starting Docker container..."
+	docker-compose up -d
 
 # 停止命令
 stop:
-    @echo "Stopping Docker container..."
-    docker-compose down
+	@echo "Stopping Docker container..."
+	docker-compose down
 
 # 构建命令（可选）
 build:
-    @echo "Building Docker image..."
-    docker-compose build
+	@echo "Building Docker image..."
+	docker-compose build
 
 # 清理命令（可选）
 clean:
-    @echo "Cleaning up Docker images and containers..."
-    docker-compose down --rmi all --volumes --remove-orphans
+	@echo "Cleaning up Docker images and containers..."
+	docker-compose down --rmi all --volumes --remove-orphans
