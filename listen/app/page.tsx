@@ -10,17 +10,19 @@ const api_key =
 
 export default function Home() {
   const [words, setWords] = useState<Word[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getUserWords({ API_KEY: api_key }).then((ws) => {
       setWords(ws);
+      setLoading(false);
     });
   }, []);
 
   return (
     <main className='container mx-auto p-4'>
       <h1 className='text-2xl font-bold mb-4'>Word Filter</h1>
-      <WordFilterTable words={words} />
+      {loading ? <p>Loading...</p> : <WordFilterTable words={words} />}
     </main>
   );
 }
