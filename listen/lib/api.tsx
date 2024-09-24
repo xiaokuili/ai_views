@@ -1,6 +1,6 @@
 import { Word } from "@/types/word";
 
-const API_BASE_URL = "http://67.207.82.160:8000";
+const API_BASE_URL = "https://67.207.82.160:8000";
 
 export async function getUserWords({
   API_KEY,
