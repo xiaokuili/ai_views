@@ -18,3 +18,12 @@ export interface SQLPredictRequest {
 export interface SQLPredictResponse {
   predicted_sql: string;
 }
+
+export interface ProviewProcessingStepsRequest {
+  old_title: string;
+  new_title: string;
+}
+
+export interface ProviewProcessingStepsResponse {
+  [key: string]: Array<Record<string, any>>;
+}

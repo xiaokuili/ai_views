@@ -18,10 +18,11 @@ export function ConfigPanel({
 
   const addSection = () => {
     const newSection: Section = {
-      id: "",
+      id: uuid(),
       section_template: "",
       section_template_description: "",
       example: "",
+      order: sections.length + 1,
     };
     setSections([...sections, newSection]);
   };

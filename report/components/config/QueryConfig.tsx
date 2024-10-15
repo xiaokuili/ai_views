@@ -43,11 +43,13 @@ export function QueryConfig({
   templateTitle,
   sectionId,
   query,
+  onQueryUpdate,
 }: {
   templateId: string;
   templateTitle: string;
   sectionId: string;
   query: Query;
+  onQueryUpdate: (query: Query) => void;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -92,6 +94,7 @@ export function QueryConfig({
         section_id: sectionId,
       };
       await createOrUpdateQuery(sectionId, updateQuery);
+      onQueryUpdate(updateQuery);
       toast({
         title: "Success",
         description: `Query ${query.id} updated successfully`,
@@ -118,7 +121,7 @@ export function QueryConfig({
     });
   }
   async function onDelete() {
-    if (!id) {
+    if (!query.id) {
       toast({
         title: "Error",
         description: "Cannot delete a query without an ID",

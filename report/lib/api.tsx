@@ -10,6 +10,8 @@ import {
   QueryResponse,
   SQLPredictRequest,
   SQLPredictResponse,
+  ProviewProcessingStepsRequest,
+  ProviewProcessingStepsResponse,
 } from "../types/api";
 const API_BASE_URL = "http://localhost:8000/report"; // 根据你的API路由进行调整
 
@@ -501,4 +503,46 @@ export async function getProcessingStepsBySection(
   }
 
   return response.json();
+}
+
+/**
+ * 测试并执行特定的处理步骤
+ * @param processingStepId 处理步骤的唯一标识符
+ * @param request 包含 old_title 和 new_title 的请求对象
+ * @returns 处理步骤执行结果的列表
+ * @throws ApiError 如果请求失败
+ */
+export async function ProviewProcessingStep(
+  processingStepId: string,
+  request: ProviewProcessingStepsRequest
+): Promise<ProviewProcessingStepsResponse> {
+  const url = `${API_BASE_URL}/test_processing_steps/${processingStepId}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // 如果需要认证，添加认证头
+        // 'Authorization': `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new ApiError(
+        response.status,
+        errorData.detail ||
+          "An error occurred while testing the processing step"
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, "An unexpected error occurred");
+  }
 }

@@ -19,6 +19,7 @@ import { CardLayout } from "./Layout";
 import { createOrUpdateProcessStep, deleteProcessStep } from "@/lib/api";
 import { ActionButtons } from "../ActionButton";
 import { ProcessStep } from "@/types/base";
+import { useTestReportContext } from "@/context/ReportContext";
 
 const formSchema = z.object({
   function_name: z.string().min(1, {
@@ -38,15 +39,22 @@ const formSchema = z.object({
 export function ProcessStepConfig({
   step,
   sectionId,
+  templateTitle,
+  templateId,
 }: {
   step: ProcessStep;
   sectionId: string;
+  templateTitle: string;
+  templateId: string;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [cardTitle, setCardTitle] = useState(
     step?.description || "Processing Step"
   );
+
+  const { setTestReportState } = useTestReportContext();
+
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -105,7 +113,7 @@ export function ProcessStepConfig({
 
     setIsDeleting(true);
     try {
-      await deleteProcessStep(sectionId, step.id);
+      await deleteProcessStep(step.id);
       toast({
         title: "Success",
         description: `Processing step ${step.id} deleted successfully`,
@@ -120,6 +128,16 @@ export function ProcessStepConfig({
       setIsDeleting(false);
     }
   }
+
+  const onPreview = () => {
+    setTestReportState({
+      type: "processing_step",
+      templateTitle,
+      templateId,
+      sectionId,
+      id: step.id,
+    });
+  };
 
   const Header = (title: string) => (
     <div className='flex items-center space-x-2'>
@@ -216,5 +234,11 @@ export function ProcessStepConfig({
     </Form>
   );
 
-  return <CardLayout header={Header(cardTitle)} content={content} />;
+  return (
+    <CardLayout
+      header={Header(cardTitle)}
+      content={content}
+      onTest={onPreview}
+    />
+  );
 }

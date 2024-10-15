@@ -21,17 +21,22 @@ export default function Home() {
       setIsLoading(true);
       setError(null);
       try {
-        const templateId = "2864467e-292d-4762-b4cb-dbec9d4e857c";
+        //简报生成
+        // const templateId = "1f7dd63b-5b86-49f0-8b39-9ac5266a1464";
+
+        // 外迁报告
+        const templateId = "e03dc441-668c-43d5-88a7-0003d8dc0c2c";
+
         const fetchedTemplate = await getReportTemplate(templateId);
         setTemplate(fetchedTemplate);
 
         const fetchedSections = await listSections(templateId);
         setSections(fetchedSections);
       } catch (err) {
-        setError("Failed to fetch data. Please try again later.");
-        toast({
-          title: "Error",
-          description: "Failed to fetch data. Please try again later.",
+        setTemplate({
+          id: String(uuid()),
+          title: "",
+          description: "",
         });
       } finally {
         setIsLoading(false);

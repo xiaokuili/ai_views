@@ -23,6 +23,8 @@ import {
   BarChart,
   Table,
   Loader2,
+  LineChart,
+  PieChart,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -44,15 +46,21 @@ import {
   SQLSearchResponse,
   searchSQL,
   predictSectionProcessingSteps,
+  getProcessingStepsBySection,
 } from "@/lib/api";
 import { ProcessStepConfig } from "./ProcessStepConfig";
+import { describe } from "node:test";
+
 // 定义 SectionType 枚举
 enum SectionType {
   LLM = "llm",
   TEXT = "text",
-  CHART = "chart",
   TABLE = "table",
+  BAR = "bar",
+  LINE = "line",
+  PIE = "pie",
 }
+
 const sectionSchema = z.object({
   section_template: z
     .string()
@@ -64,12 +72,16 @@ const sectionSchema = z.object({
 export function SectionConfig({
   templateId,
   templateTitle,
-  section,
+  section: initialSection,
 }: {
   templateId: string;
   templateTitle: string;
   section: Section;
 }) {
+  const [section, setSection] = useState<Section>({
+    ...initialSection,
+    id: initialSection.id || String(uuid()), // 初始化时生成 ID
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sectionTemplate, setSectionTemplate] = useState(
@@ -78,8 +90,9 @@ export function SectionConfig({
   const [isLoadingQuery, setIsLoadingQuery] = useState(false);
   const [query, setQuery] = useState<Query | null>(null);
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([]);
-  const [savedSection, setSavedSection] = useState<Section>(section);
   const [isLoadingSteps, setIsLoadingSteps] = useState(false);
+  const [isLoadingInitialSteps, setIsLoadingInitialSteps] = useState(false);
+
   const { setTestReportState } = useTestReportContext();
   const { toast } = useToast();
 
@@ -102,36 +115,40 @@ export function SectionConfig({
   }, [form.watch]);
 
   useEffect(() => {
-    const fetchOrCreateQuery = async () => {
+    const fetchData = async () => {
       setIsLoadingQuery(true);
+      setIsLoadingInitialSteps(true);
       try {
-        if (section.id) {
-          // 如果 section 已经有 id，尝试获取对应的 query
-          const fetchedQuery = await getQueryBySection(section.id);
-          setQuery(fetchedQuery);
-        } else {
-          // 如果是新的 section，创建一个空的 query
-          createEmptyQuery();
-        }
+        // 获取 query
+        const fetchedQuery = await getQueryBySection(section.id);
+        setQuery(fetchedQuery);
+
+        // 获取 processing steps
+        const fetchedSteps = await getProcessingStepsBySection(section.id);
+        setProcessingSteps(fetchedSteps);
       } catch (error) {
-        console.error("Failed to fetch or create query:", error);
+        console.error("Failed to fetch data:", error);
         if (error instanceof ApiError && error.status === 404) {
-          // 如果是 404 错误，静默地创建一个空的 query
-          createEmptyQuery();
+          // 如果是 404 错误，静默地创建空数据
+          createQuery();
+          setProcessingSteps([]);
         } else {
           // 对于其他错误，显示错误消息
           toast({
             title: "Error",
-            description: "Failed to load query data. Using a default query.",
+            description: "Failed to load data. Using default values.",
             variant: "destructive",
           });
-          createEmptyQuery();
+          createQuery();
+          setProcessingSteps([]);
         }
       } finally {
         setIsLoadingQuery(false);
+        setIsLoadingInitialSteps(false);
       }
     };
-    const createEmptyQuery = () => {
+
+    const createQuery = () => {
       setQuery({
         id: String(uuid()),
         sql: "",
@@ -141,7 +158,7 @@ export function SectionConfig({
       });
     };
 
-    fetchOrCreateQuery();
+    fetchData();
   }, [section.id, toast]);
 
   const handleAddProcessingStep = async () => {
@@ -155,6 +172,22 @@ export function SectionConfig({
       return;
     }
     setIsLoadingSteps(true);
+    if (processingSteps.length > 0) {
+      setProcessingSteps([
+        ...processingSteps,
+        {
+          id: String(uuid()),
+          describe: "",
+          function_name: "",
+          order: processingSteps.length + 1,
+          parameters: processingSteps[0].parameters,
+          outputs: processingSteps[0].outputs,
+        },
+      ]);
+
+      setIsLoadingSteps(false);
+      return;
+    }
 
     try {
       // 1. 请求数据
@@ -164,15 +197,12 @@ export function SectionConfig({
       );
 
       // 2. 调用 generate_steps 接口
-      const generatedSteps = await predictSectionProcessingSteps(
-        savedSection.id,
-        {
-          section: savedSection,
-          data_source_example: dataSourceExample,
-        }
-      );
+      const generatedSteps = await predictSectionProcessingSteps(section.id, {
+        section: section,
+        data_source_example: dataSourceExample,
+      });
       generatedSteps.forEach((step) => {
-        step.section_id = savedSection.id;
+        step.section_id = section.id;
       });
       console.log("generatedSteps", generatedSteps);
       // 4. 更新处理步骤
@@ -216,6 +246,9 @@ export function SectionConfig({
     }
   };
 
+  const handleQueryUpdate = (updatedQuery: Query) => {
+    setQuery(updatedQuery);
+  };
   const handleDeleteProcessingStep = (id: string) => {
     setProcessingSteps(processingSteps.filter((step) => step.id !== id));
   };
@@ -230,13 +263,13 @@ export function SectionConfig({
       return;
     }
     setIsSubmitting(true);
-    const previousSection = { ...savedSection };
+    const previousSection = { ...section };
     const updatedSection: Section = {
       ...section,
       ...values,
-      id: section.id || String(uuid()),
+      id: section.id, // 使用已生成的 ID
     };
-    setSavedSection(updatedSection);
+    setSection(updatedSection);
     try {
       await upsertSection(templateId, updatedSection);
       toast({
@@ -244,7 +277,7 @@ export function SectionConfig({
         description: `Section ${section.id} updated successfully`,
       });
     } catch (error) {
-      setSavedSection(previousSection);
+      setSection(previousSection);
       toast({
         title: "Error",
         description: `Failed to save section ${section.id}: ${
@@ -362,16 +395,28 @@ export function SectionConfig({
                         Text
                       </div>
                     </SelectItem>
-                    <SelectItem value={SectionType.CHART}>
-                      <div className='flex items-center'>
-                        <BarChart className='mr-2 h-4 w-4' />
-                        Chart
-                      </div>
-                    </SelectItem>
                     <SelectItem value={SectionType.TABLE}>
                       <div className='flex items-center'>
                         <Table className='mr-2 h-4 w-4' />
                         Table
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={SectionType.BAR}>
+                      <div className='flex items-center'>
+                        <BarChart className='mr-2 h-4 w-4' />
+                        Bar
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={SectionType.LINE}>
+                      <div className='flex items-center'>
+                        <LineChart className='mr-2 h-4 w-4' />
+                        Line
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={SectionType.PIE}>
+                      <div className='flex items-center'>
+                        <PieChart className='mr-2 h-4 w-4' />
+                        Pie
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -400,8 +445,9 @@ export function SectionConfig({
             <QueryConfig
               templateId={templateId}
               templateTitle={templateTitle}
-              sectionId={section.id || String(uuid())} // 如果 section 没有 id，生成一个临时 id
+              sectionId={section.id} // 使用已生成的 ID
               query={query}
+              onQueryUpdate={handleQueryUpdate}
             />
           ) : (
             <div>Error loading query data.</div>
@@ -412,11 +458,27 @@ export function SectionConfig({
       <div className='mt-6'>
         <h3 className='text-lg font-semibold mb-2'>Processing Steps</h3>
         <Card className='p-4'>
-          {processingSteps.map((step, index) => (
-            <div key={step.id} className='mb-4 p-3 border rounded-md relative'>
-              <ProcessStepConfig step={step} sectionId={section.id} />
+          {isLoadingInitialSteps ? (
+            <div className='flex justify-center items-center h-20'>
+              <Loader2 className='w-6 h-6 animate-spin' />
             </div>
-          ))}
+          ) : processingSteps.length > 0 ? (
+            processingSteps.map((step) => (
+              <div
+                key={step.id}
+                className='mb-4 p-3 border rounded-md relative'
+              >
+                <ProcessStepConfig
+                  step={step}
+                  sectionId={section.id}
+                  templateId={templateId}
+                  templateTitle={templateTitle}
+                />
+              </div>
+            ))
+          ) : (
+            <p className='text-gray-500'>No processing steps found.</p>
+          )}
           <Button
             onClick={handleAddProcessingStep}
             className='w-full mt-2'

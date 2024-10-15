@@ -17,6 +17,7 @@ export interface Section {
   section_template: string;
   example: string;
   section_type: string;
+  order: number;
 }
 
 export interface Query {
